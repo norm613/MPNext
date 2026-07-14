@@ -110,4 +110,35 @@ export class ContactService {
       $userId !== null ? { $userId } : undefined
     );
   }
+
+  /**
+   * Looks up a single Contact by phone number for inbound caller-ID resolution
+   * (e.g. the parish emergency line). Matches Mobile, Company, and Household
+   * Home phone. Normalizes any input — including Twilio E.164 like
+   * "+14023508149" — to MP's stored dashed format ("402-350-8149") by taking
+   * the last 10 digits. The matched value contains only digits and dashes, so
+   * it is injection-safe by construction.
+   *
+   * @param phone - phone number in any format
+   * @returns Promise<ContactSearch | null> - the matched contact, or null
+   *          (callers should fall back to the Unassigned Contact, ID 10)
+   */
+  public async getContactByPhone(phone: string): Promise<ContactSearch | null> {
+    const digits = (phone || "").replace(/\D/g, "");
+    const last10 = digits.slice(-10);
+    if (last10.length !== 10) return null;
+    const dashed = `${last10.slice(0, 3)}-${last10.slice(3, 6)}-${last10.slice(6)}`;
+
+    const records = await this.mp!.getTableRecords<ContactSearch>({
+      table: "Contacts",
+      filter:
+        `Mobile_Phone = '${dashed}' OR Company_Phone = '${dashed}' ` +
+        `OR Household_ID_Table.Home_Phone = '${dashed}'`,
+      select:
+        "Contact_ID, Contact_GUID, First_Name, Nickname, Last_Name, Email_Address, Mobile_Phone, dp_fileUniqueId AS Image_GUID",
+      top: 1,
+    });
+
+    return records.length > 0 ? records[0] : null;
+  }
 }
