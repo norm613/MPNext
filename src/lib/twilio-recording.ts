@@ -1,14 +1,15 @@
 /**
  * Downloads a Twilio call recording as MP3 bytes, server-side, using the
  * restricted read-only Recordings API key. Never runs in the browser.
- * Returns a Uint8Array (plain ArrayBuffer-backed) so it is directly usable as a
- * File/Blob part — a Node Buffer is NOT assignable to DOM BlobPart under strict
- * TS.
+ * Returns a raw ArrayBuffer — unambiguously a DOM BlobPart, so it drops
+ * straight into `new File([...])`. (A Node Buffer and even a bare Uint8Array
+ * fail strict-TS BlobPart assignment because their buffer type widens to
+ * ArrayBufferLike.)
  *
  * Env (set in Vercel + .env.local):
  *   TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET
  */
-export async function downloadRecordingMp3(recordingSid: string): Promise<Uint8Array> {
+export async function downloadRecordingMp3(recordingSid: string): Promise<ArrayBuffer> {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const keySid = process.env.TWILIO_API_KEY_SID;
   const keySecret = process.env.TWILIO_API_KEY_SECRET;
@@ -23,5 +24,5 @@ export async function downloadRecordingMp3(recordingSid: string): Promise<Uint8A
   if (!res.ok) {
     throw new Error(`Twilio recording download failed: HTTP ${res.status}`);
   }
-  return new Uint8Array(await res.arrayBuffer());
+  return await res.arrayBuffer();
 }
